@@ -179,14 +179,34 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2f4fb9c572e62b84191570fc1d5fa727, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  links:
-  - {fileID: 1712689687023327116}
-  - {fileID: 4214999665432622515}
-  - {fileID: 4617711264728700427}
-  - {fileID: 2931984801203942169}
+  joints:
+  - transform: {fileID: 1712689687023327116}
+    constraint:
+      minAngle: 0
+      maxAngle: 0
+      useMin: 0
+      useMax: 0
+  - transform: {fileID: 4214999665432622515}
+    constraint:
+      minAngle: 0
+      maxAngle: 145
+      useMin: 1
+      useMax: 1
+  - transform: {fileID: 4617711264728700427}
+    constraint:
+      minAngle: 0
+      maxAngle: 145
+      useMin: 1
+      useMax: 1
+  - transform: {fileID: 2931984801203942169}
+    constraint:
+      minAngle: 0
+      maxAngle: 0
+      useMin: 0
+      useMax: 0
   target: {fileID: 608034952710247116}
   maxIterations: 1
-  stepSize: 0.05
+  stepSize: 1
   epsilon: 0.1
 --- !u!4 &4214999665432622515 stripped
 Transform:
