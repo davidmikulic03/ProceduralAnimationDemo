@@ -1,22 +1,20 @@
 using System;
-using System.Runtime.CompilerServices;
-using Unity.VisualScripting;
 using UnityEngine;
 
-public class InverseKinematics : MonoBehaviour
+public class InverseKinematics2D : MonoBehaviour
 {
     [Tooltip("Every bone object in the order root, ..., end.")]
     [SerializeField] private JointIK[] joints;
     [SerializeField] private Transform target;
     [Range(1, 100)]
     [SerializeField] private int maxIterations;
-    [Range(0.1f, 20f)]
-    [SerializeField] float stepSize = 0.01f;
+    [Range(0.001f, 0.5f)]
+    [SerializeField] float maxStepSize = 0.01f;
     [SerializeField] float epsilon = 0.01f;
 
     private void Start()
     {
-        
+        Initialize();
     }
 
     private void FixedUpdate()
@@ -24,44 +22,44 @@ public class InverseKinematics : MonoBehaviour
         IK();
     }
 
-    void TargetTriangle(int jointIndex, out float angle, out Vector3 axis)
+    void Initialize()
+    {
+        int numBones = joints.Length - 1;
+
+        for (int i = 0; i < numBones; i++)
+        {
+            joints[i].length = GetJointLength(i);
+            joints[i].restOfChainLength = GetLengthOfRemainingChain(i);
+        }
+    }
+
+    float GetAngleToTarget(int jointIndex)
     {
         Vector3 toEnd = joints[^1].transform.position - joints[jointIndex].transform.position;
         Vector3 toTarget = target.position - joints[jointIndex].transform.position;
 
-        axis = Vector3.Cross(toEnd, toTarget);
-        axis.y = 0;
-        axis.x = 0;
-        axis = axis.normalized;
-        Debug.Log(axis);
-        angle = Mathf.Acos(Vector3.Dot(toEnd.normalized, toTarget.normalized));
-    }
+        Vector3 axis = Vector3.Cross(toEnd, toTarget);
+        float angle = Mathf.Acos(Vector3.Dot(toEnd.normalized, toTarget.normalized)) * Mathf.Sign(axis.z);
 
-    void GetLinkData(out float[] angles, out Vector3[] axes)
-    {
-        int numBones = joints.Length - 1;
-        angles = new float[numBones];
-        axes = new Vector3[numBones];
+        if (angle == float.NaN) 
+            return 0;
 
-        for (int i = 0; i < numBones; i++)
-            TargetTriangle(i, out angles[i], out axes[i]);
+        return angle;
     }
 
     float GetJointLength(int jointIndex)
     {
         return (joints[jointIndex + 1].transform.position - joints[jointIndex].transform.position).magnitude;
     }
-
     float GetDistanceToTarget(int jointIndex)
     {
         return (target.position - joints[jointIndex].transform.position).magnitude;
     }
-
     float GetLengthOfRemainingChain(int jointIndex)
     {
         float output = 0;
 
-        for(int i = jointIndex; i < joints.Length - 1; i++)
+        for(int i = jointIndex + 1; i < joints.Length - 1; i++)
         {
             output += GetJointLength(i);
         }
@@ -72,7 +70,7 @@ public class InverseKinematics : MonoBehaviour
     void IK()
     {
         int i = 0;
-        for(i = 0; i < maxIterations - 1; i++) 
+        for(i = 0; i < maxIterations; i++) 
         {
             if ((target.position - joints[^1].transform.position).sqrMagnitude < epsilon * epsilon)
                 break;
@@ -92,23 +90,23 @@ public class InverseKinematics : MonoBehaviour
 
     void SetRotationFor(int jointIndex)
     {
-        float a = GetJointLength(jointIndex);
-        float b = GetLengthOfRemainingChain(jointIndex);
+        float a = joints[jointIndex].length;
+        float b = joints[jointIndex].restOfChainLength;
         float c = GetDistanceToTarget(jointIndex);
 
-        float angle;
-        Vector3 axis;
-        TargetTriangle(jointIndex, out angle, out axis);
+        float angle = GetAngleToTarget(jointIndex);
 
-        if(c > a + b)
+        Debug.Log(angle * Mathf.Rad2Deg);
+
+        if (c > a + b)
         {
-            joints[jointIndex].transform.eulerAngles += angle * axis;
+            joints[jointIndex].transform.localEulerAngles += angle * Vector3.forward;
             return;
         }
 
         if(c < Mathf.Abs(a - b)) 
         {
-            joints[jointIndex].transform.eulerAngles -= angle * axis;
+            joints[jointIndex].transform.localEulerAngles -= angle * Vector3.forward;
             return;
         }
 
@@ -116,18 +114,19 @@ public class InverseKinematics : MonoBehaviour
         float bSqr = b * b;
         float cSqr = c * c;
 
-        if(aSqr + bSqr - cSqr > 0)
+        if(aSqr + bSqr > cSqr)
         {
             float cosPsi = (aSqr - bSqr + cSqr) / (2 * a * c);
             float psi = Mathf.Acos(cosPsi);
-
-            float betaT = angle - psi;
+            float sign = MathF.Sign(angle);
+            float betaT = Mathf.Abs(angle) - psi;
+            betaT *= sign;
 
             if (betaT > 0.5 * Mathf.PI) betaT -= Mathf.PI;
-            float increment = stepSize * Mathf.Deg2Rad;
-            betaT += increment;
+            float increment = maxStepSize * Mathf.Deg2Rad;
+            betaT += angle < 0 ? increment : -increment;
 
-            joints[jointIndex].transform.eulerAngles += betaT * axis;
+            joints[jointIndex].transform.eulerAngles += betaT * Vector3.forward;
         }
     }
 }
@@ -136,6 +135,8 @@ public class InverseKinematics : MonoBehaviour
 public struct JointIK
 {
     public Transform transform;
+    [HideInInspector] public float length;
+    [HideInInspector] public float restOfChainLength;
     public IKConstraint constraint;
 }
 
